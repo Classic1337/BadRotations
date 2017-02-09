@@ -452,6 +452,7 @@ br.idList = {
                 bloodtalons                 = 145152,
                 clearcasting                = 135700,
                 elunesGuidance              = 202060,
+                fieryRedMaimers             = 236757,
                 incarnationKingOfTheJungle  = 102543,
                 predatorySwiftness          = 69369,
                 savageRoar                  = 52610,
@@ -1204,6 +1205,8 @@ br.idList = {
                 strikeOfTheWindlord         = 205320,
                 touchOfDeath                = 115080,
                 touchOfKarma                = 122470,
+                transcendence               = 101643,
+                transcendenceTransfer       = 119996,
                 whirlingDragonPunch         = 152175,
             },
             artifacts                       = {
@@ -1229,9 +1232,11 @@ br.idList = {
             buffs                           = {
                 serenity                    = 152173,
                 stormEarthAndFire           = 137639,
+                healingWinds                = 195381,
                 hitCombo                    = 196741,
                 theEmperorsCapacitor        = 235054,
                 touchOfKarma                = 122470,
+                transcendence               = 101643,
             },
             debuffs                         = {
                 markOfTheCrane              = 228287,
@@ -1334,14 +1339,17 @@ br.idList = {
             },
             buffs                           = {
                 auraOfMercy                 = 183415;
+                auraMastery                 = 31821;
                 avengingWrath               = 31842;
                 beaconOfLight               = 53563;
                 beaconOfFaith               = 53563;
                 bestowFaith                 = 223306;
                 divineProtection            = 498;
                 divinePurpose               = 216411;
+                ferventMartyr               = 223316;
                 infusionOfLight             = 54149;
                 ruleOfLaw                   = 214202;
+                theLightSaves               = 200421;
                 vindicator                  = 200376;
 
             },

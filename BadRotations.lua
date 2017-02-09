@@ -11,11 +11,18 @@ br.loadedIn = false
 br.rotations = {}
 -- developers debug, use /run br.data.settings[br.selectedSpec].toggles["isDebugging"] = true
 br.debug = {}
+-- Cache all non-nil return values from GetSpellInfo in a table to improve performance
+local spellcache = setmetatable({}, {__index=function(t,v) local a = {GetSpellInfo(v)} if GetSpellInfo(v) then t[v] = a end return a end})
+local function GetSpellInfo(a)
+    return unpack(spellcache[a])
+end
+-- Custom Print
 function br.debug:Print(message)
 	if br.data.settings[br.selectedSpec].toggles["isDebugging"] == true then
 		Print(message)
 	end
 end
+-- Run
 function br:Run()
 	if br.selectedSpec == nil then br.selectedSpec = select(2,GetSpecializationInfo(GetSpecialization())) end
 	rc = LibStub("LibRangeCheck-2.0")
@@ -148,11 +155,6 @@ end)
 C_Timer.NewTicker(0.1, function()
 	if isChecked("HE Active") then
 		br.friend:Update()
-	end
-end)
-C_Timer.NewTicker(0.1, function()
-	if br.player ~= nil then
-		br.player:update()
 	end
 end)
 --[[Updating UI]]

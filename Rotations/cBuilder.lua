@@ -129,14 +129,6 @@ function br.loader:new(spec,specName)
     for k,v in pairs(self.spell.debuffs) do
         if self.debuff[k] == nil then self.debuff[k] = {} end
         local debuff = self.debuff[k]
-        if debuff.applied == nil then debuff.applied  = {} end
-        for l, w in pairs(debuff.applied) do
-            if not UnitAffectingCombat("player") or UnitIsDeadOrGhost(l) then
-                debuff.applied[l] = nil
-            elseif not UnitDebuffID(l,v,"player") then
-                debuff.applied[l] = 0
-            end
-        end
         debuff.exists = function(thisUnit,sourceUnit)
             if thisUnit == nil then thisUnit = 'target' end
             if sourceUnit == nil then sourceUnit = 'player' end
@@ -167,6 +159,56 @@ function br.loader:new(spec,specName)
         end
         debuff.count = function()
             return tonumber(getDebuffCount(v))
+        end
+        debuff.applied = function(thisUnit)
+            return debuff.bleed[thisUnit] or 0
+        end
+    end
+
+    -- self.bestUnit = function(range,aoe)
+    --     if aoe == nil then aoe = false end
+    --     if aoe then
+    --         return dynamicTarget(range, false)
+    --     else
+    --         return dynamicTarget(range, true)
+    --     end
+    -- end
+
+-- Build Best Unit and Enemies List per Range
+    local typicalRanges = {
+        50,
+        45,
+        40, -- Typical Ranged Limit
+        35,
+        30,
+        25,
+        23,
+        22.75,
+        20,
+        18,
+        15,
+        13, -- Feral Interrupt
+        12,
+        10, -- Other Typical AoE Effect
+        9, -- Monk Artifact
+        8, -- Typical AoE Effect
+        5, -- Typical Melee
+    }
+    for x = 1, #typicalRanges do
+        local i = typicalRanges[x]
+
+        self.units["dyn"..i] = function(aoe)
+            if aoe == nil then aoe = false end
+            if aoe then
+                return dynamicTarget(i, false)
+            else
+                return dynamicTarget(i, true)
+            end
+        end
+
+        self.enemies["yards"..i] = function(unit)
+            if unit == nil then unit = "player" end
+            return getEnemies(unit,i)
         end
     end
 
@@ -201,10 +243,11 @@ function br.loader:new(spec,specName)
             elseif thisUnit == nil then
                 if IsUsableSpell(v) and isKnown(v) then
                     if maxRange ~= nil and maxRange > 0 then
-                        thisUnit = self.units["dyn"..tostring(maxRange)]
+                        if maxRange > 50 then maxRange = 50 end
+                        thisUnit = self.units["dyn"..tostring(maxRange)]()
                         amIinRange = getDistance(thisUnit) < maxRange
                     else
-                        thisUnit = self.units.dyn5
+                        thisUnit = self.units.dyn5()
                         amIinRange = getDistance(thisUnit) < 5
                     end
                 end
@@ -260,12 +303,12 @@ function br.loader:new(spec,specName)
     function self.update()
         -- Call baseUpdate()
         self.baseUpdate()
-        local startTime = debugprofilestop()
+        -- local startTime = debugprofilestop()
         self.cBuilder()
-        br.debug.cpu.cBuilder.totalIterations = br.debug.cpu.cBuilder.totalIterations + 1
-        br.debug.cpu.cBuilder.currentTime = debugprofilestop()-startTime
-        br.debug.cpu.cBuilder.elapsedTime = br.debug.cpu.cBuilder.elapsedTime + debugprofilestop()-startTime
-        br.debug.cpu.cBuilder.averageTime = br.debug.cpu.cBuilder.elapsedTime / br.debug.cpu.cBuilder.totalIterations
+        -- br.debug.cpu.cBuilder.totalIterations = br.debug.cpu.cBuilder.totalIterations + 1
+        -- br.debug.cpu.cBuilder.currentTime = debugprofilestop()-startTime
+        -- br.debug.cpu.cBuilder.elapsedTime = br.debug.cpu.cBuilder.elapsedTime + debugprofilestop()-startTime
+        -- br.debug.cpu.cBuilder.averageTime = br.debug.cpu.cBuilder.elapsedTime / br.debug.cpu.cBuilder.totalIterations
         self.getPetInfo()
         self.getToggleModes()
         -- Start selected rotation
@@ -279,28 +322,6 @@ function br.loader:new(spec,specName)
 
         -- local timeStart = debugprofilestop()
         -- Update Power
-        -- self.mana           = UnitPower("player", 0)
-        -- self.rage           = UnitPower("player", 1)
-        -- self.focus          = UnitPower("player", 2)
-        -- self.energy         = UnitPower("player", 3)
-        -- self.comboPoints    = UnitPower("player", 4)
-        -- self.runes          = UnitPower("player", 5)
-        -- self.runicPower     = UnitPower("player", 6)
-        -- self.soulShards     = UnitPower("player", 7)
-        -- self.lunarPower     = UnitPower("player", 8)
-        -- self.holyPower      = UnitPower("player", 9)
-        -- self.altPower       = UnitPower("player",10)
-        -- self.maelstrom      = UnitPower("player",11)
-        -- self.chi            = UnitPower("player",12)
-        -- self.insanity       = UnitPower("player",13)
-        -- self.obsolete       = UnitPower("player",14)
-        -- self.obsolete2      = UnitPower("player",15)
-        -- self.arcaneCharges  = UnitPower("player",16)
-        -- self.fury           = UnitPower("player",17)
-        -- self.pain           = UnitPower("player",18)
-        -- self.powerRegen     = getRegen("player")
-        -- self.timeToMax      = getTimeToMax("player")
-
         powerList     = {
             mana            = 0,
             rage            = 1,
@@ -356,34 +377,71 @@ function br.loader:new(spec,specName)
         self.power.regen     = getRegen("player")
         self.power.ttm       = getTimeToMax("player")
 
-        -- Build Best Unit per Range
-        local typicalRanges = {
-            40, -- Typical Ranged Limit
-            35,
-            30,
-            25,
-            20,
-            15,
-            13, -- Feral Interrupt
-            12,
-            10, -- Other Typical AoE Effect
-            9, -- Monk Artifact
-            8, -- Typical AoE Effect
-            5, -- Typical Melee
-        }
-        for x = 1, #typicalRanges do
-            local i = typicalRanges[x]
-            self.units["dyn"..tostring(i)]                  = dynamicTarget(i, true)
-            self.units["dyn"..tostring(i).."AoE"]           = dynamicTarget(i, false)
-            self.enemies["yards"..tostring(i)]              = getEnemies("player",i)
-            self.enemies["yards"..tostring(i).."t"]         = getEnemies(self.units["dyn"..tostring(i)],i)
-        end
+        -- -- Build Best Unit and Enemies List per Range
+        -- local typicalRanges = {
+        --     40, -- Typical Ranged Limit
+        --     35,
+        --     30,
+        --     25,
+        --     20,
+        --     15,
+        --     13, -- Feral Interrupt
+        --     12,
+        --     10, -- Other Typical AoE Effect
+        --     9, -- Monk Artifact
+        --     8, -- Typical AoE Effect
+        --     5, -- Typical Melee
+        -- }
+        -- for x = 1, #typicalRanges do
+        --     local i = typicalRanges[x]
+        --     -- Assign Best Target In Front for Set Yards
+        --     self.units["dyn"..tostring(i)] = dynamicTarget(i, true)
+        --     -- Assign Best Target In AoE for Set Yards
+        --     self.units["dyn"..tostring(i).."AoE"] = dynamicTarget(i, false)
+        --     -- Prep Enemies Per Yards tables
+        --     if self.enemies["yards"..tostring(i)] == nil then self.enemies["yards"..tostring(i)] = {} else table.wipe(self.enemies["yards"..tostring(i)]) end
+        --     if i <= 10 then
+        --         if self.enemies["yards"..tostring(i).."t"] == nil then self.enemies["yards"..tostring(i).."t"] = {} else table.wipe(self.enemies["yards"..tostring(i).."t"]) end
+        --     end
+        -- end
+        -- for k, v in pairs(br.enemy) do
+        --     -- -- Store enemies in Debuff Applied for adding applied bleed values to
+        --     -- if self.debuff.applied == nil then self.debuff.applied = {} end
+        --     -- if self.debuff.applied[k] == nil then self.debuff.applied[k] = 0 end
+        --     -- Find ranges enemy is present in and add to tables
+        --     local thisUnit = br.enemy[k].unit
+        --     local thisDistance = getDistance(thisUnit)
+        --     for x = 1, #typicalRanges do
+        --         local i = typicalRanges[x]
+        --         -- Assign enemies to tables for specific yard
+        --         if thisDistance < i then
+        --             table.insert(self.enemies["yards"..tostring(i)],thisUnit)
+        --         end
+        --         local thisDistanceT = getDistance(self.units["dyn"..tostring(i)],thisUnit)
+        --         if thisDistanceT < i and i <= 10 then
+        --             table.insert(self.enemies["yards"..tostring(i).."t"],thisUnit)
+        --         end
+        --     end
+        -- end
 
         if not UnitAffectingCombat("player") then
             -- Build Artifact Info
             for k,v in pairs(self.spell.artifacts) do
                 self.artifact[k] = hasPerk(v) or false
                 self.artifact.rank[k] = getPerkRank(v) or 0
+            end
+        end
+
+        for k, v in pairs(self.debuff) do
+            if k == "rake" or k == "rip" then
+                if self.debuff[k].bleed == nil then self.debuff[k].bleed = {} end
+                for l, w in pairs(self.debuff[k].bleed) do
+                    if not UnitAffectingCombat("player") or UnitIsDeadOrGhost(l) then
+                        self.debuff[k].bleed[l] = nil
+                    elseif not self.debuff[k].exists(l) then
+                        self.debuff[k].bleed[l] = 0
+                    end
+                end
             end
         end
 

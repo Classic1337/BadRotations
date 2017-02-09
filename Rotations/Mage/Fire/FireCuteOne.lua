@@ -73,6 +73,8 @@ local function createOptions()
             end
         -- Frost Nova
             br.ui:createSpinner(section, "Frost Nova",  50,  0,  100,  5,  "|cffFFBB00Health Percentage to use at.");
+        -- Blazing Barrier
+            br.ui:createCheckbox(section,"Blazing Barrier")
         br.ui:checkSectionState(section)
     -- Interrupt Options
         section = br.ui:createSection(br.ui.window.profile, "Interrupts")
@@ -132,7 +134,7 @@ local function runRotation()
         local deadMouse                                     = UnitIsDeadOrGhost("mouseover")
         local deadtar, attacktar, hastar, playertar         = deadtar or UnitIsDeadOrGhost("target"), attacktar or UnitCanAttack("target", "player"), hastar or ObjectExists("target"), UnitIsPlayer("target")
         local debuff                                        = br.player.debuff
-        local enemies                                       = br.player.enemies
+        local enemies                                       = enemies or {}
         local falling, swimming, flying, moving             = getFallTime(), IsSwimming(), IsFlying(), GetUnitSpeed("player")>0
         local flaskBuff                                     = getBuffRemain("player",br.player.flask.wod.buff.agilityBig)
         local friendly                                      = friendly or UnitIsFriend("target", "player")
@@ -162,7 +164,13 @@ local function runRotation()
         local talent                                        = br.player.talent
         local ttd                                           = getTTD
         local ttm                                           = br.player.power.ttm
-        local units                                         = br.player.units
+        local units                                         = units or {}
+
+        units.dyn40 = br.player.units.dyn40()
+        enemies.yards8t = br.player.enemies.yards8(br.player.units.dyn8(true))
+        enemies.yards10t = br.player.enemies.yards10(br.player.units.dyn10(true))
+        enemies.yards12 = br.player.enemies.yards12()
+        enemies.yards30 = br.player.enemies.yards30()
 
         if leftCombat == nil then leftCombat = GetTime() end
         if profileStop == nil then profileStop = false end
@@ -288,8 +296,8 @@ local function runRotation()
                 if cast.blastWave() then return end
             end
         -- Meteor
-            -- meteor,if=cooldown.combustion.remain()s>30|(cooldown.combustion.remain()s>target.time_to_die)|buff.rune_of_power.up
-            if cd.combustion > 30 or (cd.combustion > ttd("target")) or buff.runeOfPower.exists() then
+            -- meteor,if=cooldown.combustion.remains>30|(cooldown.combustion.remains>target.time_to_die)|buff.rune_of_power.up
+            if (cd.combustion > 30 or (cd.combustion > ttd("target")) or buff.runeOfPower.exists()) and ttd("target") > 8 then
                 if cast.meteor() then return end
             end
         -- Cinderstorm
@@ -497,6 +505,17 @@ local function runRotation()
     --- SimulationCraft APL ---
     ---------------------------
                 if getOptionValue("APL Mode") == 1 then
+        -- Blazing Barrier
+                    if isChecked("Blazing Barrier") and not buff.blazingBarrier.exists() then
+                        if cast.blazingBarrier() then return end
+                    end
+        -- Flamestrike
+                    -- flamestrike,if=talent.flame_patch.enabled&active_enemies>2&buff.hot_streak.react
+                    if ((#enemies.yards8t >= 3 and mode.rotation == 1) or mode.rotation == 2) and buff.hotStreak.exists() then
+                        if cast.flamestrike("best",nil,2,8) then return end
+                    elseif ((#enemies.yards8t >= 3 and mode.rotation == 1) or mode.rotation == 2) and buff.hotStreak.exists() and not talent.pyromaniac then
+                        if cast.flamestrike("best",nil,2,8) then return end
+                    end
         -- Mirror Image
                     -- mirror_image,if=buff.combustion.down
                     if isChecked("Mirror Image") and not buff.combustion.exists() then

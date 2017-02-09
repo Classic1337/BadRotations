@@ -72,7 +72,7 @@ local function runRotation()
         local cd                                            = br.player.cd
         local charges                                       = br.player.charges
         local debuff                                        = br.player.debuff
-        local enemies                                       = br.player.enemies
+        local enemies                                       = enemies or {}
         local falling, swimming, flying, moving             = getFallTime(), IsSwimming(), IsFlying(), GetUnitSpeed("player")>0
         local gcd                                           = br.player.gcd
         local healPot                                       = getHealthPot()
@@ -93,7 +93,7 @@ local function runRotation()
         local spell                                         = br.player.spell
         local talent                                        = br.player.talent
         local ttm                                           = br.player.power.ttm
-        local units                                         = br.player.units
+        local units                                         = units or {}
 
         local lowest                                        = {}    --Lowest Unit
         lowest.hp                                           = br.friend[1].hp
@@ -103,6 +103,8 @@ local function runRotation()
         lowest.guid                                         = br.friend[1].guid                      
         local tank                                          = {}    --Tank
         local averageHealth                                 = 0
+
+        units.dyn40 = br.player.units.dyn40()
 
 		for i = 1, #br.friend do
 			if UnitIsDeadOrGhost(br.friend[i].unit) or getDistance(br.friend[i].unit) > 40 then 
@@ -123,8 +125,6 @@ local function runRotation()
         
         if leftCombat == nil then leftCombat = GetTime() end
         if profileStop == nil then profileStop = false end
-
-        ClearTarget()
 
 --------------------
 --- Action Lists ---
@@ -247,7 +247,7 @@ local function runRotation()
 --- Rotations ---
 -----------------
         -- Pause
-        if pause() or (UnitExists("target") and (UnitIsDeadOrGhost("target") or not UnitCanAttack("target", "player"))) or mode.rotation == 4 then
+        if pause() or mode.rotation == 4 then
             return true
         else
 ---------------------------------

@@ -16,21 +16,21 @@ function GetObjectPosition(Unit)
     if FireHack and GetObjectExists(Unit) then
         return ObjectPosition(Unit)
     else
-        return false
+        return 0, 0, 0
     end
 end
 function GetObjectType(Unit)
     if FireHack and GetObjectExists(Unit) then
         return ObjectType(Unit)
     else
-        return false
+        return 65561
     end
 end
 function GetObjectIndex(Index)
     if FireHack and GetObjectExists(GetObjectWithIndex(Index)) then
         return GetObjectWithIndex(Index)
     else
-        return false
+        return 0
     end
 end
 function GetObjectCountBR()
@@ -205,6 +205,18 @@ function UnitBuffID(unit,spellID,filter)
 		end
 	end
 end
+-- function UnitBuffID(unit,spellID)
+-- 	for i=1,40 do
+-- 		local _,_,_,_,_,_,_,buffCaster,_,_,buffSpellID = UnitBuff(unit,i)
+-- 		if buffSpellID ~= nil then
+-- 			if buffSpellID == spellID then
+-- 				return true
+-- 			end
+-- 		end
+-- 	end
+-- 	return false
+-- end
+
 function UnitDebuffID(unit,spellID,filter)
 	local spellName = GetSpellInfo(spellID)
 	if filter == nil then
@@ -2607,7 +2619,7 @@ function isValidUnit(Unit)
 		-- Only consider Units that I have threat with or I am alone and have targeted when not in Combat and in an Instance.
 		if not UnitAffectingCombat("player") and IsInInstance() and (threat or (#br.friend == 1 and myTarget)) then return true end
 		-- Only consider Units that I have threat with or I can attack and have targeted or are dummies within 20yrds when in Combat.
-		if UnitAffectingCombat("player") and (threat or myTarget or (isDummy(Unit) and inAggroRange)) then return true end
+		if UnitAffectingCombat("player") and (threat or (myTarget and inAggroRange)) then return true end
 		-- Unit is Soul Effigy
         if ObjectID(Unit) == 103679 then return true end
 	end

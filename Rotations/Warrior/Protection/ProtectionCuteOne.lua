@@ -189,7 +189,7 @@ local function runRotation()
         local deadMouse                                     = UnitIsDeadOrGhost("mouseover")
         local deadtar, attacktar, hastar, playertar         = deadtar or UnitIsDeadOrGhost("target"), attacktar or UnitCanAttack("target", "player"), hastar or ObjectExists("target"), UnitIsPlayer("target")
         local debuff                                        = br.player.debuff
-        local enemies                                       = br.player.enemies
+        local enemies                                       = enemies or {}
         local falling, swimming, flying, moving             = getFallTime(), IsSwimming(), IsFlying(), GetUnitSpeed("player")>0
         local friendly                                      = friendly or UnitIsFriend("target", "player")
         local gcd                                           = br.player.gcd
@@ -215,10 +215,16 @@ local function runRotation()
         local solo                                          = br.player.instance=="none"
         local spell                                         = br.player.spell
         local talent                                        = br.player.talent
-        local thp                                           = getHP(br.player.units.dyn5)
+        local thp                                           = getHP(br.player.units.dyn5())
         local ttd                                           = getTTD
         local ttm                                           = br.player.power.ttm
-        local units                                         = br.player.units
+        local units                                         = units or {}
+
+        units.dyn5 = br.player.units.dyn5()
+        units.dyn8 = br.player.units.dyn8()
+        enemies.yards5 = br.player.enemies.yards5()
+        enemies.yards8 = br.player.enemies.yards8()
+        enemies.yards40 = br.player.enemies.yards40()
 
         if leftCombat == nil then leftCombat = GetTime() end
         if profileStop == nil then profileStop = false end
@@ -483,7 +489,7 @@ local function runRotation()
         -- Revenge
             -- revenge,if=cooldown.shield_slam.remain()s<=gcd.max*2
             -- revenge,if=cooldown.shield_slam.remain()s<=gcd.max*1.5|spell_targets.revenge>=2
-            if cd.shieldSlam <= gcd * 1.5 or ((mode.rotation == 1 and #enemies.yards5 >= 2) or mode.rotation == 2) then
+            if cd.shieldSlam <= gcd * 1.5 or ((mode.rotation == 1 and #enemies.yards5 >= 1) or mode.rotation == 2) then
                 if cast.revenge() then return end
             end
         -- Ignore Pain
@@ -495,7 +501,7 @@ local function runRotation()
             end
         -- Thunder Clap
             -- thunder_clap,if=spell_targets.thunder_clap>=4
-            if ((mode.rotation == 1 and #enemies.yards8 >= 4) or mode.rotation == 2) then
+            if ((mode.rotation == 1 and #enemies.yards8 >= 1) or mode.rotation == 2) then
                 if cast.thunderClap() then return end
             end
         -- Devastate

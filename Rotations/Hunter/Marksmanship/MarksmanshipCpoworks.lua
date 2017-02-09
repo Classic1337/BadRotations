@@ -54,6 +54,8 @@ local function createOptions()
             br.ui:createDropdown(section, "Auto Summon", {"Pet 1","Pet 2","Pet 3","Pet 4","Pet 5",}, 1, "Select the pet you want to use")
         -- Mend Pet
             br.ui:createSpinner(section, "Mend Pet",  50,  0,  100,  5,  "|cffFFFFFFHealth Percent to Cast At")
+        -- Explosive Shor
+            br.ui:createCheckbox(section, "Explosive Shot")
         br.ui:checkSectionState(section)
     -- Cooldown Options
         section = br.ui:createSection(br.ui.window.profile, "Cooldowns")
@@ -140,7 +142,7 @@ local function runRotation()
         local deadMouse                                     = UnitIsDeadOrGhost("mouseover")
         local deadtar, attacktar, hastar, playertar         = deadtar or UnitIsDeadOrGhost("target"), attacktar or UnitCanAttack("target", "player"), hastar or ObjectExists("target"), UnitIsPlayer("target")
         local debuff, debuffcount                           = br.player.debuff, br.player.debuffcount
-        local enemies                                       = br.player.enemies
+        local enemies                                       = enemies or {}
         local falling, swimming, flying, moving             = getFallTime(), IsSwimming(), IsFlying(), GetUnitSpeed("player")>0
         local fatality                                      = false
         local flaskBuff                                     = getBuffRemain("player",br.player.flask.wod.buff.agilityBig)
@@ -172,7 +174,10 @@ local function runRotation()
         local trinketProc                                   = false
         local ttd                                           = getTTD
         local ttm                                           = br.player.power.ttm
-        local units                                         = br.player.units
+        local units                                         = units or {}
+
+        units.dyn40 = br.player.units.dyn40()
+        enemies.yards40 = br.player.enemies.yards40()
 
         if leftCombat == nil then leftCombat = GetTime() end
         if profileStop == nil then profileStop = false end
@@ -464,7 +469,7 @@ local function runRotation()
                 if cast.piercingShot(units.dyn40) then return end
             end
             -- Windburst
-            if cast.windburst(units.dyn40) then return end
+            if cast.windburst(units.dyn40) and not debuff.vulnerable.exists(units.dyn40) then return end
             -- Aimed Shot
             -- if HasBuff(LockAndLoad) and HasBuff(Vulnerable) and HasTalent(PatientSniper)
             if buff.lockAndLoad.exists() and debuff.vulnerable.exists(units.dyn40) then
@@ -491,7 +496,7 @@ local function runRotation()
                 if cast.aimedShot(units.dyn40) then return end
             end
             -- Marked Shot
-            if not talent.patientSniper or debuff.vulnerable.remain(units.dyn40) < getCastTime(spell.aimedShot) then
+            if not talent.patientSniper or (debuff.vulnerable.remain(units.dyn40) < getCastTime(spell.aimedShot) and (debuff.huntersMark.remain(units.dyn40) < gcd or power > 75)) then
                 if cast.markedShot(units.dyn40) then return end
             end
             -- Bursting Shot
@@ -502,7 +507,7 @@ local function runRotation()
                 if cast.blackArrow(units.dyn40) then return end
             end
             -- Explosive Shot
-            if talent.explosiveShot then
+            if isChecked("Explosive Shot") and talent.explosiveShot then
                 if cast.explosiveShot(units.dyn40) then explosiveTarget = units.dyn40; return end
             end
             -- Aimed Shot
@@ -512,7 +517,7 @@ local function runRotation()
             -- Sidewinders
             -- if not HasBuff(HuntersMark) and (HasBuff(MarkingTargets) or HasBuff(Trueshot)) or
             -- ChargeSecRemaining(Sidewinders) < BuffDurationSec(Vulnerable) - SpellCastTimeSec(AimedShot)
-            if talent.sidewinders and debuff.huntersMark.exists(units.dyn40) == false and (buff.markingTargets.exists() or buff.trueshot.exists()) or recharge.sidewinders < debuff.vulnerable.duration(units.dyn40) - getCastTime(spell.aimedShot) then
+            if talent.sidewinders and debuff.huntersMark.exists(units.dyn40) == false and (buff.markingTargets.exists() or buff.trueshot.exists()) or recharge.sidewinders < (debuff.vulnerable.duration(units.dyn40) - getCastTime(spell.aimedShot)) then
                 if cast.sidewinders(units.dyn40) then return end
             end
             -- Arcane Shot
@@ -536,7 +541,7 @@ local function runRotation()
             -- if HasItem(MagnetizedBlastingCapLauncher)
 
             -- Explosive Shot
-            if talent.explosiveShot then
+            if isChecked("Explosive Shot") and talent.explosiveShot then
                 if cast.explosiveShot(units.dyn40) then explosiveTarget = units.dyn40; return end
             end
             -- Multi-Shot

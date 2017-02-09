@@ -169,7 +169,7 @@ local function runRotation()
         local charges       = br.player.charges
         local combatTime    = getCombatTime()
         local debuff        = br.player.debuff
-        local enemies       = br.player.enemies
+        local enemies       = enemies or {}
         local gcd           = br.player.gcd
         local hastar        = ObjectExists("target")
         local healPot       = getHealthPot()
@@ -185,8 +185,13 @@ local function runRotation()
         local solo          = GetNumGroupMembers() == 0
         local spell         = br.player.spell
         local talent        = br.player.talent
-        local ttd           = getTTD(br.player.units.dyn5)
-        local units         = br.player.units
+        local ttd           = getTTD(br.player.units.dyn5())
+        local units         = units or {}
+
+        units.dyn5 = br.player.units.dyn5()
+        enemies.yards5 = br.player.enemies.yards5()
+        enemies.yards8 = br.player.enemies.yards8()
+        enemies.yards10 = br.player.enemies.yards10()
 
         if profileStop == nil then profileStop = false end
         if opener == nil then opener = false end
@@ -224,7 +229,7 @@ local function runRotation()
                 if cast.handOfFreedom() then return end
             end
         -- Hand of Hinderance
-            if isMoving("target") and not getFacing("target","player") and getDistance("target") > 8 then
+            if isChecked("Hand of Hinderance") and isMoving("target") and not getFacing("target","player") and getDistance("target") > 8 then
                 if cast.handOfHinderance("target") then return end
             end
         -- Greater Blessing of Might
@@ -367,11 +372,11 @@ local function runRotation()
                 end
                 if getOptionValue("APL Mode") == 2 then
             -- Crusade
-                    if isChecked("Crusade") then
+                    if isChecked("Crusade") and talent.crusade then
                         if cast.crusade() then return end
                     end
             -- Avenging Wrath
-                    if isChecked("Avenging Wrath") then
+                    if isChecked("Avenging Wrath") and not talent.crusade then
                         if cast.avengingWrath() then return end
                     end
                 end
@@ -481,7 +486,7 @@ local function runRotation()
                         end
             -- Avenging Wrath
                         -- avenging_wrath
-                        if isChecked("Avenging Wrath") then
+                        if isChecked("Avenging Wrath") and not talent.crusade then
                             if cast.avengingWrath() then return end
                         end
             -- Shield of Vengeance
@@ -491,7 +496,7 @@ local function runRotation()
                         end
             -- Crusade
                         -- crusade,if=holy_power>=5&!equipped.137048|((equipped.137048|race.blood_elf)&time<2|time>2&holy_power>=4)
-                        if isChecked("Crusade") then
+                        if isChecked("Crusade") and talent.crusade then
                             if (holyPower >= 5 and not hasEquiped(137048)) or ((hasEquiped(137048) or race == "BloodElf") and combatTime < 2 or combatTime > 2 and holyPower >= 4) then
                                 if cast.crusade() then return end
                             end

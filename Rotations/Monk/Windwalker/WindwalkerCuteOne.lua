@@ -104,6 +104,8 @@ local function createOptions()
             br.ui:createCheckbox(section,"Detox")
         -- Healing Elixir
             br.ui:createSpinner(section, "Healing Elixir", 50, 0, 100, 5, "|cffFFFFFFHealth Percent to Cast At")
+        -- Healing Winds
+            br.ui:createSpinner(section, "Healing Winds", 50, 0, 100, 5, "|cffFFFFFFHealth To Use Transcendence (Healing Winds Perk)")
         -- Leg Sweep
             br.ui:createSpinner(section, "Leg Sweep - HP", 50, 0, 100, 5, "|cffFFFFFFHealth Percent to Cast At")
             br.ui:createSpinner(section, "Leg Sweep - AoE", 5, 0, 10, 1, "|cffFFFFFFNumber of Units in 5 Yards to Cast At")
@@ -193,16 +195,17 @@ local function runRotation()
         local chiMax            = br.player.power.chi.max
         local combatTime        = getCombatTime()
         local debuff            = br.player.debuff
-        local enemies           = br.player.enemies
+        local enemies           = enemies or {}
         local flaskBuff         = getBuffRemain("player",br.player.flask.wod.buff.agilityBig) or 0
         local gcd               = br.player.gcd
         local glyph             = br.player.glyph
         local healthPot         = getHealthPot() or 0
         local inCombat          = br.player.inCombat
         local inRaid            = select(2,IsInInstance())=="raid"
-        local lastSpell         = lastSpellCast
+        local lastSpell         = lastCast
         local level             = br.player.level
         local mode              = br.player.mode
+        local moving            = GetUnitSpeed("player")>0
         local php               = br.player.health
         local power             = br.player.power.amount.energy
         local powerMax          = br.player.power.energy.max
@@ -218,12 +221,16 @@ local function runRotation()
         local t18_2pc           = br.player.eq.t18_2pc
         local t18_4pc           = br.player.eq.t18_4pc
         local talent            = br.player.talent
-        local thp               = getHP(br.player.units.dyn5)
+        local thp               = getHP(br.player.units.dyn5())
         local trinketProc       = false --br.player.hasTrinketProc()
-        local ttd               = getTTD(br.player.units.dyn5)
+        local ttd               = getTTD(br.player.units.dyn5())
         local ttm               = br.player.power.ttm
-        local units             = br.player.units
-        if lastSpell == nil then lastSpell = 0 end
+        local units             = units or {}
+
+        units.dyn5 = br.player.units.dyn5()
+        enemies.yards5 = br.player.enemies.yards5()
+
+        if lastSpell == nil or not inCombat then lastSpell = 6603 end
         if leftCombat == nil then leftCombat = GetTime() end
         if profileStop == nil then profileStop = false end
         if opener == nil then opener = false end
@@ -294,6 +301,12 @@ local function runRotation()
         --     Print(select(1,GetSpellInfo(lastSpell)))
         --     prevSpell = lastSpell
         -- end
+
+        -- Healing Winds - Transcendence Cancel
+        if tPX == nil or tPY == nil or tPZ == nil then tPX, tPY, tPZ = ObjectPosition("player") end
+        if getDistanceToObject("player",tPX,tPY,tPZ) > 40 or (not inCombat and php > getOptionValue("Healing Winds")) then
+            CancelUnitBuff("player",GetSpellInfo(spell.buffs.transcendence))
+        end
 
 --------------------
 --- Action Lists ---
@@ -408,23 +421,32 @@ local function runRotation()
                         end
                     end
                 end
+        -- Healing Winds
+                if isChecked("Healing Winds") and php <= getOptionValue("Healing Winds") and artifact.healingWinds and not moving then
+                    if not buff.transcendence.exists() then
+                        if cast.transcendence("player") then tPX, tPY, tPz = GetObjectPosition("player"); return end
+                    end
+                    if buff.transcendence.exists() then
+                        if cast.transcendenceTransfer("player") then tPX, tPY, tPz = GetObjectPosition("player"); return end
+                    end
+                end
         -- Effuse
                 if isChecked("Effuse") and ((not inCombat and php <= getOptionValue("Effuse")) --[[or (inCombat and php <= getOptionValue("Effuse") / 2)]]) then
                     if cast.effuse() then return end
                 end
         -- Healing Elixir
-                if isChecked("Healing Elixir") and php <= getValue("Healing Elixir") then
+                if isChecked("Healing Elixir") and php <= getOptionValue("Healing Elixir") then
                     if cast.healingElixir() then return end
                 end
         -- Leg Sweep
-                if isChecked("Leg Sweep - HP") and php <= getValue("Leg Sweep - HP") and inCombat and #enemies.yards5 > 0 then
+                if isChecked("Leg Sweep - HP") and php <= getOptionValue("Leg Sweep - HP") and inCombat and #enemies.yards5 > 0 then
                     if cast.legSweep() then return end
                 end
-                if isChecked("Leg Sweep - AoE") and #enemies.yards5 >= getValue("Leg Sweep - AoE") then
+                if isChecked("Leg Sweep - AoE") and #enemies.yards5 >= getOptionValue("Leg Sweep - AoE") then
                     if cast.legSweep() then return end
                 end
         -- Touch of Karma
-                if isChecked("Touch of Karma") and php <= getValue("Touch of Karma") and inCombat then
+                if isChecked("Touch of Karma") and php <= getOptionValue("Touch of Karma") and inCombat then
                     if cast.touchOfKarma() then return end
                 end
             end -- End Defensive Check
@@ -509,6 +531,9 @@ local function runRotation()
                     if artifact.galeBurst and not talent.serenity and not hasEquiped(137057) and cd.strikeOfTheWindlord < 8 and cd.fistsOfFury <= 4 and cd.risingSunKick < 7 then
                         if cast.touchOfDeath() then return end
                     end
+            -- Draught of Souls
+                -- use_item,name=draught_of_souls,if=talent.serenity.enabled&cooldown.serenity.remains>=20&!buff.serenity.up
+                -- use_item,name=draught_of_souls,if=!talent.serenity.enabled&!buff.storm_earth_and_fire.up
                 end
             end
         end -- End Cooldown - Action List
@@ -538,9 +563,13 @@ local function runRotation()
                             end
         -- Potion
                         -- potion,name=old_war
-                        elseif useCDs() and canUse(127844) and isChecked("Potion") and getDistance("target") < 15 then
-                            Print("Potion Used!");
-                            useItem(127844)
+                        elseif useCDs() and isChecked("Potion") and getDistance("target") < 15 then
+                            if canUse(127884) and talent.serenity then
+                                useItem(127844)
+                            end
+                            if canUse(142117) and talent.whirlingDragonPunch then
+                                useItem(142117)
+                            end
                         end
                     end
         -- Chi Wave (In Range)
@@ -581,7 +610,7 @@ local function runRotation()
                         elseif EE and not FoF1 then
                             castOpener("fistsOfFury","FoF1",9)
         -- Strike of the Windlord
-                        elseif FoF1 and not SotW then
+                        elseif FoF1 and not SotW and getDistance(units.dyn5) < 5 then
                             castOpener("strikeOfTheWindlord","SotW",10)
         -- Tiger Palm
                         elseif SotW and not TP2 then
@@ -621,9 +650,13 @@ local function runRotation()
                             end
         -- Potion
                         -- potion,name=old_war
-                        elseif useCDs() and canUse(127844) and isChecked("Potion") and getDistance("target") < 15 then
-                            Print("Potion Used!");
-                            useItem(127844)
+                        elseif useCDs() and isChecked("Potion") and getDistance("target") < 15 then
+                            if canUse(127884) and talent.serenity then
+                                useItem(127844)
+                            end
+                            if canUse(142117) and talent.whirlingDragonPunch then
+                                useItem(142117)
+                            end
                         end
                     end
         -- Chi Wave (In Range)
@@ -661,7 +694,7 @@ local function runRotation()
                         elseif SEF and not FoF1 then
                             castOpener("fistsOfFury","FoF1",8)
         -- Strike of the Windlord
-                        elseif FoF1 and not SotW then
+                        elseif FoF1 and not SotW and getDistance(units.dyn5) < 5 then
                             castOpener("strikeOfTheWindlord","SotW",9)
         -- Tiger Palm
                         elseif SotW and not TP3 then
@@ -704,9 +737,13 @@ local function runRotation()
                             end
         -- Potion
                         -- potion,name=old_war
-                        elseif useCDs() and canUse(127844) and isChecked("Potion") and getDistance("target") < 15 then
-                            Print("Potion Used!");
-                            useItem(127844)
+                        elseif useCDs() and isChecked("Potion") and getDistance("target") < 15 then
+                            if canUse(127884) and talent.serenity then
+                                useItem(127844)
+                            end
+                            if canUse(142117) and talent.whirlingDragonPunch then
+                                useItem(142117)
+                            end
                         end
                     end
         -- Chi Wave (In Range)
@@ -741,7 +778,7 @@ local function runRotation()
                                 RSK1 = true
                             end
         -- Strike of the Windlord
-                        elseif RSK1 and not SotW then
+                        elseif RSK1 and not SotW and getDistance(units.dyn5) < 5 then
                             if buff.serenity.exists() then
                                 castOpener("strikeOfTheWindlord","SotW",8)
                             else
@@ -812,7 +849,7 @@ local function runRotation()
             -- strike_of_the_windlord,if=equipped.convergence_of_fates&talent.serenity.enabled&cooldown.serenity.remain()s>=10
             -- strike_of_the_windlord,if=equipped.convergence_of_fates&!talent.serenity.enabled
             -- strike_of_the_windlord,if=!equipped.convergence_of_fates
-            if ((talent.serenity and cd.serenity >= 10) or not isChecked("Serenity") or not useCDs()) or (not talent.serenity and #enemies.yards5 < 6) then
+            if (((talent.serenity and cd.serenity >= 10) or not isChecked("Serenity") or not useCDs()) or (not talent.serenity and #enemies.yards5 < 6)) and getDistance(units.dyn5) < 5 then
                 if not hasEquiped(140806) or (hasEquiped(140806) and (not talent.serenity or (talent.serenity and cd.serenity >= 10))) then
                     if cast.strikeOfTheWindlord() then return end
                 end
@@ -915,13 +952,14 @@ local function runRotation()
         -- Call Action List - Cooldowns
                 -- call_action_list,name=cd
                 if actionList_Cooldown() then return end
-                if getDistance("target") < 5 and not buff.stormEarthAndFire.exists() then
+                if getDistance("target") < 5 then
         -- Storm, Earth, and Fire
-                    -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&(cooldown.touch_of_death.remain()s<=8|cooldown.touch_of_death.remain()s>85)
+                    -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&(cooldown.touch_of_death.remains<=8|cooldown.touch_of_death.remains>85)
+                    -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&(cooldown.touch_of_death.remains<=8|cooldown.touch_of_death.remains>85)
                     -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&cooldown.storm_earth_and_fire.charges=2
                     -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&target.time_to_die<=25
                     -- storm_earth_and_fire,if=!buff.storm_earth_and_fire.up&cooldown.fists_of_fury.remain()s<=1&chi>=3
-                    if cd.touchOfDeath <= 8 or cd.touchOfDeath > 85 or charges.stormEarthAndFire == 2 or ttd <= 25 or (cd.fistsOfFury <= 1 and chi >= 3) then
+                    if not buff.stormEarthAndFire.exists() and (cd.touchOfDeath <= 8 or cd.touchOfDeath > 85 or charges.stormEarthAndFire == 2 or ttd <= 25 or (cd.fistsOfFury <= 1 and chi >= 3)) then
                         if cast.stormEarthAndFire() then return end
                     end
         -- Fists of Fury
@@ -952,7 +990,9 @@ local function runRotation()
                 if buff.serenity.exists() then
         -- Strike of the Windlord
                     -- strike_of_the_windlord
-                    if cast.strikeOfTheWindlord() then return end
+                    if getDistance(units.dyn5) < 5 then
+                        if cast.strikeOfTheWindlord() then return end
+                    end
         -- Rising Sun Kick
                     -- rising_sun_kick,cycle_targets=1,if=active_enemies<3
                     if #enemies.yards5 < 3 then
@@ -965,12 +1005,10 @@ local function runRotation()
                     end
         -- Fists of Fury
                     -- fists_of_fury
-                    -- if markPercent < 75 or #enemies.yards5 < 3 then
                     if cast.fistsOfFury() then return end
-                    -- end
         -- Spinning Crane Kick
                     -- spinning_crane_kick,if=active_enemies>=3&!prev_gcd.spinning_crane_kick
-                    if #enemies.yards5 >= 3 --[[and markPercent >= 75 ]]and (lastSpell ~= spell.spinningCraneKick or level < 78) then
+                    if #enemies.yards5 >= 3 and (lastSpell ~= spell.spinningCraneKick or level < 78) then
                         if cast.spinningCraneKick() then return end
                     end
         -- Rising Sun Kick
@@ -993,11 +1031,6 @@ local function runRotation()
                             end
                         end
                     end
-        -- -- Spinning Crane Kick
-        --         -- spinning_crane_kick,if=!prev_gcd.spinning_crane_kick
-        --         if #enemies.yards5 >= 3 and markPercent >= 75 and (lastSpell ~= spell.spinningCraneKick or level < 78) then
-        --             if cast.spinningCraneKick() then return end
-        --         end
         -- Rushing Jade Wind
                     -- rushing_jade_wind,if=!prev_gcd.rushing_jade_wind
                     if lastSpell ~= spell.rushingJadeWind or level < 78 then
@@ -1075,7 +1108,7 @@ local function runRotation()
 --- In Combat Rotation ---
 --------------------------
         -- FIGHT!
-            if inCombat and profileStop==false and isValidUnit(units.dyn5) and (opener == true or not isChecked("Opener") or not isBoss("target")) then
+            if inCombat and profileStop==false and isValidUnit(units.dyn5) and (opener == true or not isChecked("Opener") or not isBoss("target")) and not isCastingSpell(spell.spinningCraneKick) then
     ------------------
     --- Interrupts ---
     ------------------
@@ -1096,9 +1129,14 @@ local function runRotation()
         -- Potion
                     -- potion,name=old_war,if=buff.serenity.up|buff.storm_earth_and_fire.up|(!talent.serenity.enabled&trinket.proc.agility.react)|buff.bloodlust.react|target.time_to_die<=60
                     -- TODO: Agility Proc
-                    if canUse(127844) and inRaid and isChecked("Potion") and getDistance("target") < 5 then
+                    if inRaid and isChecked("Potion") and useCDs() and getDistance("target") < 5 then
                         if buff.serenity.exists() or buff.stormEarthAndFire.exists() or hasBloodLust() or ttd <= 60 then
-                            useItem(127844)
+                            if canUse(127884) and talent.serenity then
+                                useItem(127844)
+                            end
+                            if canUse(142117) and talent.whirlingDragonPunch then
+                                useItem(142117)
+                            end
                         end
                     end
         -- Touch of Death
@@ -1123,15 +1161,16 @@ local function runRotation()
         -- Call Action List - Single Target
                     -- call_action_list,name=st
                     if actionList_SingleTarget() then return end
-        -- -- No Chi
-        --             if lastSpell == spell.tigerPalm then
-        --                 if chi == 1 then
-        --                     if cast.blackoutKick() then return end
-        --                 end
-        --                 if chi == 0 then
-        --                     if cast.tigerPalm() then return end
-        --                 end
-        --             end
+        -- Blackout Kick
+                    -- 1 Chi and Last Spell == Tiger Palm catch
+                    if chi == 1 and lastSpell ~= spell.blackoutKick then
+                        if cast.blackoutKick() then return end
+                    end
+        -- Tiger Palm
+                    -- Less than equal to 1 Chi and Last Spell == Blackout Kick
+                    if chi <= 1 and lastSpell ~= spell.tigerPalm then
+                        if cast.blackoutKick() then return end
+                    end
                 end -- End Simulation Craft APL
     ----------------------------
     --- APL Mode: AskMrRobot ---
@@ -1163,7 +1202,7 @@ local function runRotation()
                             end
                         end
         -- Potion
-                        if canUse(109217) and inRaid and isChecked("Potion") then
+                        if canUse(109217) and inRaid and isChecked("Potion") and useCDs() and getDistance("target") < 5  then
                             if hasBloodLust() or ttd <= 60 then
                                 useItem(109217)
                             end
@@ -1208,7 +1247,7 @@ local function runRotation()
         -- Whirling Dragon Punch
                     if cast.whirlingDragonPunch() then return end
         -- Strike of the Windlord
-                    if ((talent.serenity and cd.serenity > 20) or not isChecked("Serenity") or not useCDs()) or not talent.serenity then
+                    if (((talent.serenity and cd.serenity > 20) or not isChecked("Serenity") or not useCDs()) or not talent.serenity) and getDistance(units.dyn5) < 5 then
                         if cast.strikeOfTheWindlord() then return end
                     end
         -- Tiger Palm
